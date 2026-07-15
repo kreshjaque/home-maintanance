@@ -98,8 +98,7 @@ class DashboardShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.read(ledgerProvider.notifier);
-    final activeHouses = state.houses.where((house) => house.active).toList();
-    final allocations = state.allocations;
+    final report = MonthlyReport.from(state);
 
     return Scaffold(
       appBar: AppBar(
@@ -134,30 +133,24 @@ class DashboardShell extends ConsumerWidget {
             return ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
               children: [
-                _HeroSummary(state: state),
+                _HeroSummary(report: report),
                 const SizedBox(height: 16),
                 if (wide)
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(flex: 7, child: _ExpensePanel(state: state)),
+                      Expanded(flex: 7, child: _ExpensePanel(report: report)),
                       const SizedBox(width: 16),
-                      Expanded(
-                        flex: 5,
-                        child: _HousePanel(
-                          state: state,
-                          allocations: allocations,
-                        ),
-                      ),
+                      Expanded(flex: 5, child: _HousePanel(report: report)),
                     ],
                   )
                 else ...[
-                  _ExpensePanel(state: state),
+                  _ExpensePanel(report: report),
                   const SizedBox(height: 16),
-                  _HousePanel(state: state, allocations: allocations),
+                  _HousePanel(report: report),
                 ],
                 const SizedBox(height: 16),
-                _SetupPanel(houses: activeHouses),
+                _SetupPanel(houses: report.activeHouses),
               ],
             );
           },
@@ -177,16 +170,17 @@ class DashboardShell extends ConsumerWidget {
 }
 
 class _HeroSummary extends ConsumerWidget {
-  const _HeroSummary({required this.state});
+  const _HeroSummary({required this.report});
 
-  final LedgerState state;
+  final MonthlyReport report;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final month = _monthFormat.format(state.selectedMonth);
-    final activeHouseCount = state.houses.where((house) => house.active).length;
-    final shared = state.sharedTotal;
+    final month = _monthFormat.format(report.state.selectedMonth);
+    final activeHouseCount = report.activeHouses.length;
+    final shared = report.sharedTotal;
     final perHouse = activeHouseCount == 0 ? 0.0 : shared / activeHouseCount;
+    final controller = ref.read(ledgerProvider.notifier);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -203,15 +197,34 @@ class _HeroSummary extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      month,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.labelLarge?.copyWith(color: _heroSoftText),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton.filledTonal(
+                          tooltip: 'Previous month',
+                          onPressed: controller.previousMonth,
+                          icon: const Icon(Icons.chevron_left),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          month,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton.filledTonal(
+                          tooltip: 'Next month',
+                          onPressed: controller.nextMonth,
+                          icon: const Icon(Icons.chevron_right),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      _money.format(state.monthTotal),
+                      _money.format(report.monthTotal),
                       style: Theme.of(context).textTheme.displaySmall?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.w800,
@@ -242,17 +255,17 @@ class _HeroSummary extends ConsumerWidget {
             children: [
               _MetricChip(
                 label: 'Common',
-                value: _money.format(state.sharedTotal),
+                value: _money.format(report.sharedTotal),
               ),
               _MetricChip(
                 label: 'Specific',
-                value: _money.format(state.specificTotal),
+                value: _money.format(report.specificTotal),
               ),
               _MetricChip(
                 label: 'Entries',
-                value: '${state.monthExpenses.length}',
+                value: '${report.monthExpenses.length}',
               ),
-              _MetricChip(label: 'Water', value: state.waterReadingText),
+              _MetricChip(label: 'Water', value: report.waterReadingText),
             ],
           ),
         ],
@@ -300,13 +313,13 @@ class _MetricChip extends StatelessWidget {
 }
 
 class _ExpensePanel extends ConsumerWidget {
-  const _ExpensePanel({required this.state});
+  const _ExpensePanel({required this.report});
 
-  final LedgerState state;
+  final MonthlyReport report;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final slices = state.categoryTotals.entries.toList();
+    final slices = report.categoryTotals.entries.toList();
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -343,10 +356,7 @@ class _ExpensePanel extends ConsumerWidget {
                     ),
             ),
             const SizedBox(height: 8),
-            for (final expense in state.monthExpenses.sortedByCompare(
-              (e) => e.date,
-              (a, b) => b.compareTo(a),
-            ))
+            for (final expense in report.monthExpensesSorted)
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: CircleAvatar(
@@ -358,7 +368,7 @@ class _ExpensePanel extends ConsumerWidget {
                 ),
                 title: Text(expense.category),
                 subtitle: Text(
-                  '${_dateFormat.format(expense.date)} - ${expense.targetHouseId == null ? 'Shared' : state.houseName(expense.targetHouseId!)}',
+                  '${_dateFormat.format(expense.date)} - ${expense.targetHouseId == null ? 'Shared' : report.state.houseName(expense.targetHouseId!)}',
                 ),
                 trailing: Wrap(
                   crossAxisAlignment: WrapCrossAlignment.center,
@@ -380,9 +390,8 @@ class _ExpensePanel extends ConsumerWidget {
                     ),
                     IconButton(
                       tooltip: 'Delete',
-                      onPressed: () => ref
-                          .read(ledgerProvider.notifier)
-                          .deleteExpense(expense.id),
+                      onPressed: () =>
+                          _confirmDeleteExpense(context, ref, expense),
                       icon: const Icon(Icons.delete_outline),
                     ),
                   ],
@@ -396,10 +405,9 @@ class _ExpensePanel extends ConsumerWidget {
 }
 
 class _HousePanel extends ConsumerWidget {
-  const _HousePanel({required this.state, required this.allocations});
+  const _HousePanel({required this.report});
 
-  final LedgerState state;
-  final Map<String, double> allocations;
+  final MonthlyReport report;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -414,10 +422,10 @@ class _HousePanel extends ConsumerWidget {
               icon: Icons.home_work_outlined,
             ),
             const SizedBox(height: 12),
-            if (state.houses.isEmpty)
+            if (report.state.houses.isEmpty)
               const Text('Add house names below to calculate each share.')
             else
-              for (final house in state.houses.where((house) => house.active))
+              for (final house in report.activeHouses)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: CircleAvatar(
@@ -429,7 +437,7 @@ class _HousePanel extends ConsumerWidget {
                   ),
                   title: Text(house.name),
                   trailing: Text(
-                    _money.format(allocations[house.id] ?? 0),
+                    _money.format(report.allocations[house.id] ?? 0),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
@@ -439,6 +447,36 @@ class _HousePanel extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+Future<void> _confirmDeleteExpense(
+  BuildContext context,
+  WidgetRef ref,
+  ExpenseEntry expense,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Delete expense?'),
+      content: Text(
+        'Remove ${expense.category} (${_money.format(expense.amount)}) from this month?',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton.tonalIcon(
+          onPressed: () => Navigator.of(context).pop(true),
+          icon: const Icon(Icons.delete_outline),
+          label: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true) {
+    await ref.read(ledgerProvider.notifier).deleteExpense(expense.id);
   }
 }
 
@@ -553,6 +591,10 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
     super.initState();
     final expense = widget.expense;
     if (expense == null) {
+      final selectedMonth = ref.read(ledgerProvider).value?.selectedMonth;
+      if (selectedMonth != null) {
+        _date = _defaultEntryDateForMonth(selectedMonth);
+      }
       return;
     }
     _date = expense.date;
@@ -679,17 +721,15 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
                   }
                 }),
               ),
-              if (_waterUsageBased) ...[
-                const SizedBox(height: 8),
-                _WaterReadingInputs(
-                  houses: houses,
-                  previousReadingControllers: _previousReadingControllers,
-                  currentReadingControllers: _currentReadingControllers,
-                ),
-                const SizedBox(height: 10),
-              ],
+              const SizedBox(height: 8),
+              _WaterReadingInputs(
+                houses: houses,
+                previousReadingControllers: _previousReadingControllers,
+                currentReadingControllers: _currentReadingControllers,
+              ),
+              const SizedBox(height: 10),
             ],
-            if (!_waterUsageBased)
+            if (!_isWaterEntry)
               DropdownButtonFormField<String?>(
                 initialValue: _targetHouseId,
                 decoration: const InputDecoration(
@@ -755,21 +795,38 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
 
   void _save() {
     final amount = double.tryParse(_amountController.text.trim()) ?? 0;
-    if (amount <= 0) return;
+    if (amount <= 0) {
+      _showFormError('Enter an amount greater than zero.');
+      return;
+    }
     final category = _effectiveCategory;
-    final waterPreviousReadings = _waterUsageBased
+    final waterPreviousReadings = _isWaterEntry
         ? _readHouseReadings(_previousReadingControllers)
         : <String, double>{};
-    final waterCurrentReadings = _waterUsageBased
+    final waterCurrentReadings = _isWaterEntry
         ? _readHouseReadings(_currentReadingControllers)
         : <String, double>{};
+    if (_waterUsageBased) {
+      final totalUsage = waterCurrentReadings.keys.fold(
+        0.0,
+        (sum, houseId) =>
+            sum +
+            _waterUsage(houseId, waterPreviousReadings, waterCurrentReadings),
+      );
+      if (totalUsage <= 0) {
+        _showFormError(
+          'Enter current readings greater than previous readings.',
+        );
+        return;
+      }
+    }
     final entry = ExpenseEntry(
       id: widget.expense?.id ?? _uuid.v4(),
       category: category,
       amount: amount,
       date: _date,
       waterMeterReading: double.tryParse(_readingController.text.trim()),
-      targetHouseId: _waterUsageBased ? null : _targetHouseId,
+      targetHouseId: _isWaterEntry ? null : _targetHouseId,
       waterUsageBased: _waterUsageBased,
       waterPreviousReadings: waterPreviousReadings,
       waterCurrentReadings: waterCurrentReadings,
@@ -782,6 +839,12 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
       controller.addExpense(entry);
     }
     Navigator.of(context).pop();
+  }
+
+  void _showFormError(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _ensureWaterReadingControllers(List<House> houses, LedgerState? state) {
@@ -841,6 +904,20 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
         if (double.tryParse(entry.value.text.trim()) != null)
           entry.key: double.parse(entry.value.text.trim()),
     };
+  }
+
+  double _waterUsage(
+    String houseId,
+    Map<String, double> previousReadings,
+    Map<String, double> currentReadings,
+  ) {
+    final previous = previousReadings[houseId];
+    final current = currentReadings[houseId];
+    if (previous == null || current == null) {
+      return 0;
+    }
+    final usage = current - previous;
+    return usage <= 0 ? 0 : usage;
   }
 }
 
@@ -972,6 +1049,27 @@ class LedgerController extends AsyncNotifier<LedgerState> {
     await _persist();
   }
 
+  Future<void> previousMonth() async {
+    final current = state.requireValue;
+    await _setSelectedMonth(
+      DateTime(current.selectedMonth.year, current.selectedMonth.month - 1),
+    );
+  }
+
+  Future<void> nextMonth() async {
+    final current = state.requireValue;
+    await _setSelectedMonth(
+      DateTime(current.selectedMonth.year, current.selectedMonth.month + 1),
+    );
+  }
+
+  Future<void> _setSelectedMonth(DateTime month) async {
+    final normalized = DateTime(month.year, month.month);
+    final current = state.requireValue;
+    state = AsyncData(current.copyWith(selectedMonth: normalized));
+    await _persist();
+  }
+
   Future<void> addExpense(ExpenseEntry expense) async {
     final current = state.requireValue;
     final customCategories = {...current.customCategories};
@@ -1027,27 +1125,44 @@ class LedgerController extends AsyncNotifier<LedgerState> {
     final bytes = utf8.encode(
       const JsonEncoder.withIndent('  ').convert(state.requireValue.toJson()),
     );
-    await Printing.sharePdf(
-      bytes: Uint8List.fromList(bytes),
-      filename: 'home-maintenance-backup.json',
+    final backup = XFile.fromData(
+      Uint8List.fromList(bytes),
+      mimeType: 'application/json',
+      name: 'home-maintenance-backup.json',
+    );
+    await SharePlus.instance.share(
+      ShareParams(files: [backup], text: 'Home maintenance backup'),
     );
   }
 
   Future<void> importBackup(BuildContext context) async {
-    final picked = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['json'],
-      withData: true,
-    );
-    final bytes = picked?.files.single.bytes;
-    if (bytes == null) {
-      return;
+    try {
+      final picked = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        withData: true,
+      );
+      final bytes = picked?.files.single.bytes;
+      if (bytes == null) {
+        return;
+      }
+      final imported = LedgerState.fromJson(
+        jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>,
+      );
+      state = AsyncData(imported);
+      await _persist();
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Backup imported.')));
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not import this backup file.')),
+        );
+      }
     }
-    final imported = LedgerState.fromJson(
-      jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>,
-    );
-    state = AsyncData(imported);
-    await _persist();
   }
 
   Future<void> downloadPdf(BuildContext context) async {
@@ -1200,7 +1315,7 @@ class LedgerState {
     final previousWaterEntries = expenses
         .where(
           (expense) =>
-              expense.waterUsageBased &&
+              _isWaterCategory(expense.category) &&
               expense.date.isBefore(before) &&
               expense.waterCurrentReadings.containsKey(houseId),
         )
@@ -1242,6 +1357,100 @@ class LedgerState {
         DateTime.tryParse(json['selectedMonth'] as String? ?? '') ??
         DateTime(DateTime.now().year, DateTime.now().month),
   );
+}
+
+class MonthlyReport {
+  MonthlyReport._({
+    required this.state,
+    required this.activeHouses,
+    required this.monthExpenses,
+    required this.monthExpensesSorted,
+    required this.categoryTotals,
+    required this.allocations,
+    required this.monthTotal,
+    required this.sharedTotal,
+    required this.specificTotal,
+    required this.waterReadingText,
+  });
+
+  factory MonthlyReport.from(LedgerState state) {
+    final activeHouses = state.houses.where((house) => house.active).toList();
+    final monthExpenses = state.expenses
+        .where(
+          (expense) =>
+              expense.date.year == state.selectedMonth.year &&
+              expense.date.month == state.selectedMonth.month,
+        )
+        .toList();
+    final monthExpensesSorted = [...monthExpenses]
+      ..sort((a, b) => b.date.compareTo(a.date));
+    final categoryTotals = <String, double>{};
+    for (final expense in monthExpenses) {
+      categoryTotals.update(
+        expense.category,
+        (value) => value + expense.amount,
+        ifAbsent: () => expense.amount,
+      );
+    }
+    final allocations = {for (final house in activeHouses) house.id: 0.0};
+    for (final expense in monthExpenses) {
+      for (final house in activeHouses) {
+        allocations.update(
+          house.id,
+          (value) => value + state.allocationForExpense(expense, house.id),
+          ifAbsent: () => state.allocationForExpense(expense, house.id),
+        );
+      }
+    }
+    final monthTotal = monthExpenses.fold(
+      0.0,
+      (sum, expense) => sum + expense.amount,
+    );
+    final sharedTotal = monthExpenses
+        .where((expense) => expense.targetHouseId == null)
+        .fold(0.0, (sum, expense) => sum + expense.amount);
+    final specificTotal = monthExpenses
+        .where((expense) => expense.targetHouseId != null)
+        .fold(0.0, (sum, expense) => sum + expense.amount);
+
+    return MonthlyReport._(
+      state: state,
+      activeHouses: activeHouses,
+      monthExpenses: monthExpenses,
+      monthExpensesSorted: monthExpensesSorted,
+      categoryTotals: categoryTotals,
+      allocations: allocations,
+      monthTotal: monthTotal,
+      sharedTotal: sharedTotal,
+      specificTotal: specificTotal,
+      waterReadingText: _waterReadingText(monthExpenses),
+    );
+  }
+
+  final LedgerState state;
+  final List<House> activeHouses;
+  final List<ExpenseEntry> monthExpenses;
+  final List<ExpenseEntry> monthExpensesSorted;
+  final Map<String, double> categoryTotals;
+  final Map<String, double> allocations;
+  final double monthTotal;
+  final double sharedTotal;
+  final double specificTotal;
+  final String waterReadingText;
+
+  static String _waterReadingText(List<ExpenseEntry> monthExpenses) {
+    final usageBasedWater = monthExpenses
+        .where((expense) => expense.waterUsageBased)
+        .lastOrNull;
+    if (usageBasedWater != null) {
+      return '${_decimal.format(usageBasedWater.totalWaterUsage)} usage';
+    }
+    final reading = monthExpenses
+        .map((expense) => expense.waterMeterReading)
+        .nonNulls
+        .lastOrNull;
+    return reading == null ? 'Not set' : _decimal.format(reading);
+  }
 }
 
 class House {
@@ -1362,6 +1571,14 @@ String _readingText(double? value) {
   return value.toStringAsFixed(value.truncateToDouble() == value ? 0 : 2);
 }
 
+DateTime _defaultEntryDateForMonth(DateTime selectedMonth) {
+  final now = DateTime.now();
+  if (now.year == selectedMonth.year && now.month == selectedMonth.month) {
+    return now;
+  }
+  return DateTime(selectedMonth.year, selectedMonth.month);
+}
+
 Map<String, double> _readDoubleMap(Object? value) {
   if (value is! Map) {
     return const {};
@@ -1403,11 +1620,11 @@ String _pdfName(LedgerState state) =>
 
 Future<Uint8List> _buildPdf(LedgerState state) async {
   final doc = pw.Document();
-  final activeHouses = state.houses.where((house) => house.active).toList();
-  final commonExpenses = state.monthExpenses
+  final report = MonthlyReport.from(state);
+  final commonExpenses = report.monthExpenses
       .where((expense) => expense.targetHouseId == null)
       .toList();
-  final houseCount = activeHouses.length;
+  final houseCount = report.activeHouses.length;
   final generatedAt = DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now());
 
   doc.addPage(
@@ -1449,23 +1666,6 @@ Future<Uint8List> _buildPdf(LedgerState state) async {
                       ),
                     ],
                   ),
-                  pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: pw.BoxDecoration(
-                      color: _pdfColor(0xffa600),
-                      borderRadius: pw.BorderRadius.circular(20),
-                    ),
-                    child: pw.Text(
-                      'PDF',
-                      style: pw.TextStyle(
-                        color: _pdfColor(0x453db2),
-                        fontWeight: pw.FontWeight.bold,
-                      ),
-                    ),
-                  ),
                 ],
               ),
               pw.SizedBox(height: 18),
@@ -1474,13 +1674,13 @@ Future<Uint8List> _buildPdf(LedgerState state) async {
                 children: [
                   _pdfMetric(
                     'Total expense',
-                    _money.format(state.monthTotal),
+                    _money.format(report.monthTotal),
                     _pdfColor(0xffffff),
                     _pdfColor(0xf0f8ff),
                   ),
                   _pdfMetric(
                     'Shared total',
-                    _money.format(state.sharedTotal),
+                    _money.format(report.sharedTotal),
                     _pdfColor(0xffffff),
                     _pdfColor(0xf0f8ff),
                   ),
@@ -1502,8 +1702,8 @@ Future<Uint8List> _buildPdf(LedgerState state) async {
           spacing: 8,
           runSpacing: 8,
           children: [
-            for (final entry in state.categoryTotals.entries)
-              _pdfCategoryChip(state, entry.key, _money.format(entry.value)),
+            for (final entry in report.categoryTotals.entries)
+              _pdfCategoryChip(report, entry.key, _money.format(entry.value)),
           ],
         ),
         pw.SizedBox(height: 18),
@@ -1513,8 +1713,8 @@ Future<Uint8List> _buildPdf(LedgerState state) async {
           spacing: 10,
           runSpacing: 12,
           children: [
-            for (final house in activeHouses)
-              _pdfHouseSplit(state, house, commonExpenses),
+            for (final house in report.activeHouses)
+              _pdfHouseSplit(report, house, commonExpenses),
           ],
         ),
         pw.Divider(color: _pdfColor(0xb7cbc6)),
@@ -1583,12 +1783,16 @@ pw.Widget _pdfSectionTitle(String title) {
   );
 }
 
-pw.Widget _pdfCategoryChip(LedgerState state, String category, String amount) {
+pw.Widget _pdfCategoryChip(
+  MonthlyReport report,
+  String category,
+  String amount,
+) {
   final color = _pdfCategoryColor(category);
-  final expenses = state.monthExpenses
+  final expenses = report.monthExpenses
       .where((expense) => expense.category == category)
       .toList();
-  final splitInfo = _pdfCategorySplitInfo(state, expenses);
+  final splitInfo = _pdfCategorySplitInfo(report.state, expenses);
   return pw.Container(
     width: 252,
     padding: const pw.EdgeInsets.all(9),
@@ -1647,11 +1851,11 @@ pw.Widget _pdfCategoryChip(LedgerState state, String category, String amount) {
 }
 
 pw.Widget _pdfHouseSplit(
-  LedgerState state,
+  MonthlyReport report,
   House house,
   List<ExpenseEntry> commonExpenses,
 ) {
-  final specificExpenses = state.monthExpenses
+  final specificExpenses = report.monthExpenses
       .where((expense) => expense.targetHouseId == house.id)
       .toList();
   final commonRows = [
@@ -1661,7 +1865,7 @@ pw.Widget _pdfHouseSplit(
         expense.waterUsageBased
             ? 'Usage ${_decimal.format(expense.waterUsageForHouse(house.id))} (${_percent.format(expense.waterUsagePercentForHouse(house.id))})'
             : 'Common split',
-        _money.format(state.allocationForExpense(expense, house.id)),
+        _money.format(report.state.allocationForExpense(expense, house.id)),
       ],
   ];
   final specificRows = [
@@ -1672,7 +1876,7 @@ pw.Widget _pdfHouseSplit(
         _money.format(expense.amount),
       ],
   ];
-  final total = state.allocations[house.id] ?? 0;
+  final total = report.allocations[house.id] ?? 0;
 
   return pw.Container(
     width: 265,
