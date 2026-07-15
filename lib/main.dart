@@ -29,12 +29,17 @@ final _dateFormat = DateFormat('dd MMM yyyy');
 final _decimal = NumberFormat.decimalPattern('en_IN');
 final _percent = NumberFormat.percentPattern('en_IN');
 
-const _appPrimary = Color(0xff6bb7d6);
-const _appSecondary = Color(0xff7fbe8f);
-const _appSurface = Color(0xfff6faf9);
-const _heroBackground = Color(0xff315f6d);
-const _heroSoftText = Color(0xffd9f1f4);
-const _heroMutedText = Color(0xffedf8f8);
+const _paletteIndigo = Color(0xff453db2);
+const _paletteBlue = Color(0xff007ad1);
+const _paletteTeal = Color(0xff009f88);
+const _paletteGreen = Color(0xff51b302);
+const _paletteAmber = Color(0xffffa600);
+const _appPrimary = _paletteBlue;
+const _appSecondary = _paletteTeal;
+const _appSurface = Color(0xfff5fbfa);
+const _heroBackground = _paletteIndigo;
+const _heroSoftText = Color(0xffe7e5ff);
+const _heroMutedText = Color(0xfff0f8ff);
 
 final ledgerProvider = AsyncNotifierProvider<LedgerController, LedgerState>(
   LedgerController.new,
@@ -1370,12 +1375,11 @@ Map<String, double> _readDoubleMap(Object? value) {
 
 Color _categoryColor(String category) {
   final colors = [
-    const Color(0xff6bb7d6),
-    const Color(0xff7fbe8f),
-    const Color(0xffd9aa79),
-    const Color(0xffd98c8c),
-    const Color(0xff9fbf8f),
-    const Color(0xffa99ad6),
+    _paletteBlue,
+    _paletteTeal,
+    _paletteGreen,
+    _paletteAmber,
+    _paletteIndigo,
   ];
   return colors[category.hashCode.abs() % colors.length];
 }
@@ -1414,7 +1418,7 @@ Future<Uint8List> _buildPdf(LedgerState state) async {
         pw.Container(
           padding: const pw.EdgeInsets.all(18),
           decoration: pw.BoxDecoration(
-            color: _pdfColor(0x103f3c),
+            color: _pdfColor(0x453db2),
             borderRadius: pw.BorderRadius.circular(8),
           ),
           child: pw.Column(
@@ -1439,7 +1443,7 @@ Future<Uint8List> _buildPdf(LedgerState state) async {
                       pw.Text(
                         _monthFormat.format(state.selectedMonth),
                         style: pw.TextStyle(
-                          color: _pdfColor(0xcdeee5),
+                          color: _pdfColor(0xe7e5ff),
                           fontSize: 12,
                         ),
                       ),
@@ -1451,13 +1455,13 @@ Future<Uint8List> _buildPdf(LedgerState state) async {
                       vertical: 6,
                     ),
                     decoration: pw.BoxDecoration(
-                      color: _pdfColor(0x2dd4bf),
+                      color: _pdfColor(0xffa600),
                       borderRadius: pw.BorderRadius.circular(20),
                     ),
                     child: pw.Text(
                       'PDF',
                       style: pw.TextStyle(
-                        color: _pdfColor(0x103f3c),
+                        color: _pdfColor(0x453db2),
                         fontWeight: pw.FontWeight.bold,
                       ),
                     ),
@@ -1472,19 +1476,19 @@ Future<Uint8List> _buildPdf(LedgerState state) async {
                     'Total expense',
                     _money.format(state.monthTotal),
                     _pdfColor(0xffffff),
-                    _pdfColor(0xe6fffb),
+                    _pdfColor(0xf0f8ff),
                   ),
                   _pdfMetric(
                     'Shared total',
                     _money.format(state.sharedTotal),
                     _pdfColor(0xffffff),
-                    _pdfColor(0xe6fffb),
+                    _pdfColor(0xf0f8ff),
                   ),
                   _pdfMetric(
                     'Houses',
                     '$houseCount',
                     _pdfColor(0xffffff),
-                    _pdfColor(0xe6fffb),
+                    _pdfColor(0xf0f8ff),
                   ),
                 ],
               ),
@@ -1505,10 +1509,14 @@ Future<Uint8List> _buildPdf(LedgerState state) async {
         pw.SizedBox(height: 18),
         _pdfSectionTitle('House-wise detailed split'),
         pw.SizedBox(height: 8),
-        for (final house in activeHouses) ...[
-          _pdfHouseSplit(state, house, commonExpenses),
-          pw.SizedBox(height: 12),
-        ],
+        pw.Wrap(
+          spacing: 10,
+          runSpacing: 12,
+          children: [
+            for (final house in activeHouses)
+              _pdfHouseSplit(state, house, commonExpenses),
+          ],
+        ),
         pw.Divider(color: _pdfColor(0xb7cbc6)),
         pw.Text(
           'Generated on $generatedAt. Share this PDF directly on WhatsApp or save it for monthly records.',
@@ -1530,7 +1538,7 @@ pw.Widget _pdfMetric(
     width: 160,
     padding: const pw.EdgeInsets.all(12),
     decoration: pw.BoxDecoration(
-      color: _pdfColor(0x285a56),
+      color: _pdfColor(0x007ad1),
       borderRadius: pw.BorderRadius.circular(8),
     ),
     child: pw.Column(
@@ -1558,7 +1566,7 @@ pw.Widget _pdfSectionTitle(String title) {
         width: 7,
         height: 18,
         decoration: pw.BoxDecoration(
-          color: _pdfColor(0x0f766e),
+          color: _pdfColor(0x007ad1),
           borderRadius: pw.BorderRadius.circular(3),
         ),
       ),
@@ -1585,7 +1593,7 @@ pw.Widget _pdfCategoryChip(LedgerState state, String category, String amount) {
     width: 252,
     padding: const pw.EdgeInsets.all(9),
     decoration: pw.BoxDecoration(
-      color: _pdfColor(0xf3faf8),
+      color: _pdfColor(0xf5fbfa),
       border: pw.Border.all(color: color, width: 0.8),
       borderRadius: pw.BorderRadius.circular(8),
     ),
@@ -1653,7 +1661,6 @@ pw.Widget _pdfHouseSplit(
         expense.waterUsageBased
             ? 'Usage ${_decimal.format(expense.waterUsageForHouse(house.id))} (${_percent.format(expense.waterUsagePercentForHouse(house.id))})'
             : 'Common split',
-        _money.format(expense.amount),
         _money.format(state.allocationForExpense(expense, house.id)),
       ],
   ];
@@ -1663,14 +1670,14 @@ pw.Widget _pdfHouseSplit(
         '${_pdfCategoryIcon(expense.category)} ${expense.category}',
         'Specific charge',
         _money.format(expense.amount),
-        _money.format(expense.amount),
       ],
   ];
   final total = state.allocations[house.id] ?? 0;
 
   return pw.Container(
+    width: 265,
     decoration: pw.BoxDecoration(
-      border: pw.Border.all(color: _pdfColor(0xd7e5e1)),
+      border: pw.Border.all(color: _pdfColor(0xd6e9ec)),
       borderRadius: pw.BorderRadius.circular(8),
     ),
     child: pw.Column(
@@ -1679,7 +1686,7 @@ pw.Widget _pdfHouseSplit(
         pw.Container(
           padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: pw.BoxDecoration(
-            color: _pdfColor(0xecf8f5),
+            color: _pdfColor(0xeef8f7),
             borderRadius: const pw.BorderRadius.only(
               topLeft: pw.Radius.circular(8),
               topRight: pw.Radius.circular(8),
@@ -1690,14 +1697,14 @@ pw.Widget _pdfHouseSplit(
             children: [
               pw.Row(
                 children: [
-                  _pdfIconBadge('H', _pdfColor(0x0f766e)),
+                  _pdfIconBadge('H', _pdfColor(0x009f88)),
                   pw.SizedBox(width: 7),
                   pw.Text(
                     house.name,
                     style: pw.TextStyle(
                       fontSize: 13,
                       fontWeight: pw.FontWeight.bold,
-                      color: _pdfColor(0x103f3c),
+                      color: _pdfColor(0x453db2),
                     ),
                   ),
                 ],
@@ -1708,7 +1715,7 @@ pw.Widget _pdfHouseSplit(
                   vertical: 4,
                 ),
                 decoration: pw.BoxDecoration(
-                  color: _pdfColor(0xffeef2),
+                  color: _pdfColor(0xfff4d6),
                   borderRadius: pw.BorderRadius.circular(16),
                 ),
                 child: pw.Text(
@@ -1716,7 +1723,7 @@ pw.Widget _pdfHouseSplit(
                   style: pw.TextStyle(
                     fontSize: 13,
                     fontWeight: pw.FontWeight.bold,
-                    color: _pdfColor(0xbe123c),
+                    color: _pdfColor(0x453db2),
                   ),
                 ),
               ),
@@ -1725,7 +1732,7 @@ pw.Widget _pdfHouseSplit(
         ),
         pw.TableHelper.fromTextArray(
           border: null,
-          headerDecoration: pw.BoxDecoration(color: _pdfColor(0xf6fbfa)),
+          headerDecoration: pw.BoxDecoration(color: _pdfColor(0xf5fbfa)),
           headerStyle: pw.TextStyle(
             fontSize: 8,
             fontWeight: pw.FontWeight.bold,
@@ -1737,12 +1744,11 @@ pw.Widget _pdfHouseSplit(
             vertical: 5,
           ),
           columnWidths: {
-            0: const pw.FlexColumnWidth(2.3),
-            1: const pw.FlexColumnWidth(1.2),
+            0: const pw.FlexColumnWidth(2.2),
+            1: const pw.FlexColumnWidth(1.45),
             2: const pw.FlexColumnWidth(1),
-            3: const pw.FlexColumnWidth(1),
           },
-          headers: ['Expense', 'Type', 'Bill total', 'This house'],
+          headers: ['Expense', 'Type', 'This house'],
           data: [...commonRows, ...specificRows],
         ),
       ],
@@ -1769,12 +1775,11 @@ pw.Widget _pdfIconBadge(String icon, PdfColor color) {
 
 PdfColor _pdfCategoryColor(String category) {
   final colors = [
-    _pdfColor(0x0f766e),
-    _pdfColor(0x2563eb),
-    _pdfColor(0xb45309),
-    _pdfColor(0xbe123c),
-    _pdfColor(0x4d7c0f),
-    _pdfColor(0x6d28d9),
+    _pdfColor(0x453db2),
+    _pdfColor(0x007ad1),
+    _pdfColor(0x009f88),
+    _pdfColor(0x51b302),
+    _pdfColor(0xffa600),
   ];
   return colors[category.hashCode.abs() % colors.length];
 }
