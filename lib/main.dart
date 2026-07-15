@@ -1,10 +1,10 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:collection/collection.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -40,6 +40,8 @@ const _appSurface = Color(0xfff5fbfa);
 const _heroBackground = _paletteIndigo;
 const _heroSoftText = Color(0xffe7e5ff);
 const _heroMutedText = Color(0xfff0f8ff);
+const _appInk = Color(0xff17211f);
+const _appMuted = Color(0xff52635f);
 
 final ledgerProvider = AsyncNotifierProvider<LedgerController, LedgerState>(
   LedgerController.new,
@@ -61,10 +63,49 @@ class HomeMaintenanceApp extends StatelessWidget {
             brightness: Brightness.light,
           ).copyWith(primary: _appPrimary, secondary: _appSecondary),
           scaffoldBackgroundColor: _appSurface,
+          appBarTheme: const AppBarTheme(
+            centerTitle: false,
+            elevation: 0,
+            scrolledUnderElevation: 1,
+            backgroundColor: _appSurface,
+            foregroundColor: _appInk,
+            systemOverlayStyle: SystemUiOverlayStyle.dark,
+          ),
           cardTheme: const CardThemeData(
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.all(Radius.circular(8)),
+            ),
+          ),
+          filledButtonTheme: FilledButtonThemeData(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(48, 48),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+          floatingActionButtonTheme: const FloatingActionButtonThemeData(
+            backgroundColor: _paletteAmber,
+            foregroundColor: _appInk,
+          ),
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: _appMuted.withValues(alpha: 0.22)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: _paletteBlue, width: 1.4),
+            ),
+          ),
+          snackBarTheme: SnackBarThemeData(
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
             ),
           ),
         ),
@@ -122,7 +163,10 @@ class DashboardShell extends ConsumerWidget {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showExpenseSheet(context),
+        onPressed: () {
+          HapticFeedback.selectionClick();
+          _showExpenseSheet(context);
+        },
         icon: const Icon(Icons.add),
         label: const Text('Add expense'),
       ),
@@ -164,6 +208,11 @@ class DashboardShell extends ConsumerWidget {
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: _appSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (_) => const ExpenseFormSheet(),
     );
   }
@@ -185,8 +234,19 @@ class _HeroSummary extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: _heroBackground,
+        gradient: const LinearGradient(
+          colors: [_heroBackground, _paletteBlue, _paletteTeal],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: _paletteBlue.withValues(alpha: 0.18),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -202,7 +262,10 @@ class _HeroSummary extends ConsumerWidget {
                       children: [
                         IconButton.filledTonal(
                           tooltip: 'Previous month',
-                          onPressed: controller.previousMonth,
+                          onPressed: () {
+                            HapticFeedback.selectionClick();
+                            controller.previousMonth();
+                          },
                           icon: const Icon(Icons.chevron_left),
                         ),
                         const SizedBox(width: 8),
@@ -217,7 +280,10 @@ class _HeroSummary extends ConsumerWidget {
                         const SizedBox(width: 8),
                         IconButton.filledTonal(
                           tooltip: 'Next month',
-                          onPressed: controller.nextMonth,
+                          onPressed: () {
+                            HapticFeedback.selectionClick();
+                            controller.nextMonth();
+                          },
                           icon: const Icon(Icons.chevron_right),
                         ),
                       ],
@@ -242,30 +308,37 @@ class _HeroSummary extends ConsumerWidget {
               ),
               IconButton.filledTonal(
                 tooltip: 'Download PDF',
-                onPressed: () =>
-                    ref.read(ledgerProvider.notifier).downloadPdf(context),
+                onPressed: () {
+                  HapticFeedback.mediumImpact();
+                  ref.read(ledgerProvider.notifier).downloadPdf(context);
+                },
                 icon: const Icon(Icons.picture_as_pdf_outlined),
               ),
             ],
           ),
           const SizedBox(height: 18),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
+          _MetricGrid(
             children: [
               _MetricChip(
                 label: 'Common',
                 value: _money.format(report.sharedTotal),
+                icon: Icons.groups_2_outlined,
               ),
               _MetricChip(
                 label: 'Specific',
                 value: _money.format(report.specificTotal),
+                icon: Icons.home_outlined,
               ),
               _MetricChip(
                 label: 'Entries',
                 value: '${report.monthExpenses.length}',
+                icon: Icons.receipt_long_outlined,
               ),
-              _MetricChip(label: 'Water', value: report.waterReadingText),
+              _MetricChip(
+                label: 'Water',
+                value: report.waterReadingText,
+                icon: Icons.water_drop_outlined,
+              ),
             ],
           ),
         ],
@@ -274,24 +347,57 @@ class _HeroSummary extends ConsumerWidget {
   }
 }
 
+class _MetricGrid extends StatelessWidget {
+  const _MetricGrid({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    const spacing = 10.0;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 680 ? 4 : 2;
+        final tileWidth =
+            (constraints.maxWidth - (spacing * (columns - 1))) / columns;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final child in children)
+              SizedBox(width: tileWidth, child: child),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class _MetricChip extends StatelessWidget {
-  const _MetricChip({required this.label, required this.value});
+  const _MetricChip({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
 
   final String label;
   final String value;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 150,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
+        color: Colors.white.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Icon(icon, color: Colors.white, size: 20),
+          const SizedBox(height: 8),
           Text(
             label,
             style: Theme.of(
@@ -334,10 +440,10 @@ class _ExpensePanel extends ConsumerWidget {
             SizedBox(
               height: 190,
               child: slices.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'Add the first expense to see the category mix.',
-                      ),
+                  ? const _EmptyState(
+                      icon: Icons.add_chart_outlined,
+                      title: 'No expenses this month',
+                      message: 'Add an entry to build the monthly split.',
                     )
                   : PieChart(
                       PieChartData(
@@ -355,46 +461,75 @@ class _ExpensePanel extends ConsumerWidget {
                       ),
                     ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             for (final expense in report.monthExpensesSorted)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(
-                  backgroundColor: _categoryColor(
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Material(
+                  color: _categoryColor(
                     expense.category,
-                  ).withValues(alpha: 0.16),
-                  foregroundColor: _categoryColor(expense.category),
-                  child: Icon(_categoryIcon(expense.category), size: 20),
-                ),
-                title: Text(expense.category),
-                subtitle: Text(
-                  '${_dateFormat.format(expense.date)} - ${expense.targetHouseId == null ? 'Shared' : report.state.houseName(expense.targetHouseId!)}',
-                ),
-                trailing: Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 4,
-                  children: [
-                    Text(
-                      _money.format(expense.amount),
-                      style: Theme.of(context).textTheme.titleMedium,
+                  ).withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(8),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.only(left: 12, right: 4),
+                    leading: CircleAvatar(
+                      backgroundColor: _categoryColor(
+                        expense.category,
+                      ).withValues(alpha: 0.16),
+                      foregroundColor: _categoryColor(expense.category),
+                      child: Icon(_categoryIcon(expense.category), size: 20),
                     ),
-                    IconButton(
-                      tooltip: 'Edit',
-                      onPressed: () => showModalBottomSheet<void>(
-                        context: context,
-                        showDragHandle: true,
-                        isScrollControlled: true,
-                        builder: (_) => ExpenseFormSheet(expense: expense),
-                      ),
-                      icon: const Icon(Icons.edit_outlined),
+                    title: Text(
+                      expense.category,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    IconButton(
-                      tooltip: 'Delete',
-                      onPressed: () =>
-                          _confirmDeleteExpense(context, ref, expense),
-                      icon: const Icon(Icons.delete_outline),
+                    subtitle: Text(
+                      '${_dateFormat.format(expense.date)} - ${expense.targetHouseId == null ? 'Shared' : report.state.houseName(expense.targetHouseId!)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ],
+                    trailing: Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 2,
+                      children: [
+                        Text(
+                          _money.format(expense.amount),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        IconButton(
+                          tooltip: 'Edit',
+                          onPressed: () {
+                            HapticFeedback.selectionClick();
+                            showModalBottomSheet<void>(
+                              context: context,
+                              showDragHandle: true,
+                              isScrollControlled: true,
+                              useSafeArea: true,
+                              backgroundColor: _appSurface,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(20),
+                                ),
+                              ),
+                              builder: (_) =>
+                                  ExpenseFormSheet(expense: expense),
+                            );
+                          },
+                          icon: const Icon(Icons.edit_outlined),
+                        ),
+                        IconButton(
+                          tooltip: 'Delete',
+                          onPressed: () {
+                            HapticFeedback.mediumImpact();
+                            _confirmDeleteExpense(context, ref, expense);
+                          },
+                          icon: const Icon(Icons.delete_outline),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
           ],
@@ -423,28 +558,144 @@ class _HousePanel extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             if (report.state.houses.isEmpty)
-              const Text('Add house names below to calculate each share.')
+              const _EmptyState(
+                icon: Icons.add_home_work_outlined,
+                title: 'No houses yet',
+                message: 'Add house names below to calculate each share.',
+              )
             else
-              for (final house in report.activeHouses)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.secondary.withValues(alpha: 0.14),
-                    foregroundColor: Theme.of(context).colorScheme.secondary,
-                    child: const Icon(Icons.home_outlined, size: 20),
-                  ),
-                  title: Text(house.name),
-                  trailing: Text(
-                    _money.format(report.allocations[house.id] ?? 0),
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+              for (final house in report.activeHouses) ...[
+                _HouseDueTile(
+                  house: house,
+                  amount: report.allocations[house.id] ?? 0,
+                  maxAmount: report.allocations.values.isEmpty
+                      ? 0
+                      : report.allocations.values.reduce(
+                          (a, b) => a > b ? a : b,
+                        ),
                 ),
+                const SizedBox(height: 8),
+              ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _HouseDueTile extends StatelessWidget {
+  const _HouseDueTile({
+    required this.house,
+    required this.amount,
+    required this.maxAmount,
+  });
+
+  final House house;
+  final double amount;
+  final double maxAmount;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = maxAmount <= 0
+        ? 0.0
+        : (amount / maxAmount).clamp(0.0, 1.0);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _paletteTeal.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: _paletteTeal.withValues(alpha: 0.14),
+            foregroundColor: _paletteTeal,
+            child: const Icon(Icons.holiday_village_outlined, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        house.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    Text(
+                      _money.format(amount),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        color: _paletteIndigo,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 6,
+                    backgroundColor: _paletteTeal.withValues(alpha: 0.1),
+                    valueColor: const AlwaysStoppedAnimation(_paletteTeal),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundColor: _paletteBlue.withValues(alpha: 0.1),
+            foregroundColor: _paletteBlue,
+            child: Icon(icon),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: _appMuted),
+          ),
+        ],
       ),
     );
   }
@@ -528,6 +779,7 @@ class _SetupPanelState extends ConsumerState<_SetupPanel> {
                   onPressed: () {
                     final name = _houseController.text.trim();
                     if (name.isEmpty) return;
+                    HapticFeedback.selectionClick();
                     ref.read(ledgerProvider.notifier).addHouse(name);
                     _houseController.clear();
                   },
@@ -543,9 +795,12 @@ class _SetupPanelState extends ConsumerState<_SetupPanel> {
               children: [
                 for (final house in widget.houses)
                   InputChip(
+                    avatar: const Icon(Icons.home_outlined, size: 18),
                     label: Text(house.name),
-                    onDeleted: () =>
-                        ref.read(ledgerProvider.notifier).removeHouse(house.id),
+                    onDeleted: () {
+                      HapticFeedback.mediumImpact();
+                      ref.read(ledgerProvider.notifier).removeHouse(house.id);
+                    },
                   ),
               ],
             ),
@@ -640,8 +895,8 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
 
     return Padding(
       padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
+        left: 18,
+        right: 18,
         bottom: MediaQuery.of(context).viewInsets.bottom + 16,
       ),
       child: SingleChildScrollView(
@@ -689,7 +944,10 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
             const SizedBox(height: 10),
             TextField(
               controller: _amountController,
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              textInputAction: TextInputAction.next,
               decoration: const InputDecoration(
                 labelText: 'Amount',
                 prefixText: 'Rs ',
@@ -699,7 +957,10 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
             const SizedBox(height: 10),
             TextField(
               controller: _readingController,
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              textInputAction: TextInputAction.next,
               decoration: const InputDecoration(
                 labelText: 'Water meter reading',
                 border: OutlineInputBorder(),
@@ -709,6 +970,7 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
             if (_isWaterEntry) ...[
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
+                secondary: const Icon(Icons.water_drop_outlined),
                 title: const Text('External source water'),
                 subtitle: const Text(
                   'Split by each house meter usage instead of equally.',
@@ -762,6 +1024,7 @@ class _ExpenseFormSheetState extends ConsumerState<ExpenseFormSheet> {
             const SizedBox(height: 10),
             OutlinedButton.icon(
               onPressed: () async {
+                HapticFeedback.selectionClick();
                 final picked = await showDatePicker(
                   context: context,
                   initialDate: _date,
@@ -1645,26 +1908,28 @@ Future<Uint8List> _buildPdf(LedgerState state) async {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'Home Maintenance Statement',
-                        style: pw.TextStyle(
-                          color: PdfColors.white,
-                          fontSize: 22,
-                          fontWeight: pw.FontWeight.bold,
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          'Home Maintenance Statement',
+                          style: pw.TextStyle(
+                            color: PdfColors.white,
+                            fontSize: 22,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      pw.SizedBox(height: 4),
-                      pw.Text(
-                        _monthFormat.format(state.selectedMonth),
-                        style: pw.TextStyle(
-                          color: _pdfColor(0xe7e5ff),
-                          fontSize: 12,
+                        pw.SizedBox(height: 4),
+                        pw.Text(
+                          '${_monthFormat.format(state.selectedMonth)} monthly split for all active houses',
+                          style: pw.TextStyle(
+                            color: _pdfColor(0xe7e5ff),
+                            fontSize: 11,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -1675,20 +1940,23 @@ Future<Uint8List> _buildPdf(LedgerState state) async {
                   _pdfMetric(
                     'Total expense',
                     _money.format(report.monthTotal),
+                    _pdfColor(0x007ad1),
                     _pdfColor(0xffffff),
                     _pdfColor(0xf0f8ff),
                   ),
                   _pdfMetric(
                     'Shared total',
                     _money.format(report.sharedTotal),
+                    _pdfColor(0x009f88),
                     _pdfColor(0xffffff),
                     _pdfColor(0xf0f8ff),
                   ),
                   _pdfMetric(
                     'Houses',
                     '$houseCount',
-                    _pdfColor(0xffffff),
-                    _pdfColor(0xf0f8ff),
+                    _pdfColor(0xffa600),
+                    _pdfColor(0x453db2),
+                    _pdfColor(0x453db2),
                   ),
                 ],
               ),
@@ -1731,6 +1999,7 @@ Future<Uint8List> _buildPdf(LedgerState state) async {
 pw.Widget _pdfMetric(
   String label,
   String value,
+  PdfColor backgroundColor,
   PdfColor valueColor,
   PdfColor labelColor,
 ) {
@@ -1738,7 +2007,7 @@ pw.Widget _pdfMetric(
     width: 160,
     padding: const pw.EdgeInsets.all(12),
     decoration: pw.BoxDecoration(
-      color: _pdfColor(0x007ad1),
+      color: backgroundColor,
       borderRadius: pw.BorderRadius.circular(8),
     ),
     child: pw.Column(
@@ -1795,7 +2064,7 @@ pw.Widget _pdfCategoryChip(
   final splitInfo = _pdfCategorySplitInfo(report.state, expenses);
   return pw.Container(
     width: 252,
-    padding: const pw.EdgeInsets.all(9),
+    padding: const pw.EdgeInsets.all(10),
     decoration: pw.BoxDecoration(
       color: _pdfColor(0xf5fbfa),
       border: pw.Border.all(color: color, width: 0.8),
@@ -1862,9 +2131,7 @@ pw.Widget _pdfHouseSplit(
     for (final expense in commonExpenses)
       [
         '${_pdfCategoryIcon(expense.category)} ${expense.category}',
-        expense.waterUsageBased
-            ? 'Usage ${_decimal.format(expense.waterUsageForHouse(house.id))} (${_percent.format(expense.waterUsagePercentForHouse(house.id))})'
-            : 'Common split',
+        _pdfExpenseSplitType(expense, house.id),
         _money.format(report.state.allocationForExpense(expense, house.id)),
       ],
   ];
@@ -1872,11 +2139,12 @@ pw.Widget _pdfHouseSplit(
     for (final expense in specificExpenses)
       [
         '${_pdfCategoryIcon(expense.category)} ${expense.category}',
-        'Specific charge',
+        'Specific',
         _money.format(expense.amount),
       ],
   ];
   final total = report.allocations[house.id] ?? 0;
+  final rows = [...commonRows, ...specificRows];
 
   return pw.Container(
     width: 265,
@@ -1897,33 +2165,13 @@ pw.Widget _pdfHouseSplit(
             ),
           ),
           child: pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Row(
-                children: [
-                  _pdfIconBadge('H', _pdfColor(0x009f88)),
-                  pw.SizedBox(width: 7),
-                  pw.Text(
-                    house.name,
-                    style: pw.TextStyle(
-                      fontSize: 13,
-                      fontWeight: pw.FontWeight.bold,
-                      color: _pdfColor(0x453db2),
-                    ),
-                  ),
-                ],
-              ),
-              pw.Container(
-                padding: const pw.EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
-                decoration: pw.BoxDecoration(
-                  color: _pdfColor(0xfff4d6),
-                  borderRadius: pw.BorderRadius.circular(16),
-                ),
+              _pdfIconBadge('H', _pdfColor(0x009f88)),
+              pw.SizedBox(width: 7),
+              pw.Expanded(
                 child: pw.Text(
-                  _money.format(total),
+                  house.name,
+                  maxLines: 1,
                   style: pw.TextStyle(
                     fontSize: 13,
                     fontWeight: pw.FontWeight.bold,
@@ -1934,30 +2182,77 @@ pw.Widget _pdfHouseSplit(
             ],
           ),
         ),
-        pw.TableHelper.fromTextArray(
-          border: null,
-          headerDecoration: pw.BoxDecoration(color: _pdfColor(0xf5fbfa)),
-          headerStyle: pw.TextStyle(
-            fontSize: 8,
-            fontWeight: pw.FontWeight.bold,
-            color: _pdfColor(0x52635f),
+        pw.Container(
+          width: double.infinity,
+          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: pw.BoxDecoration(color: _pdfColor(0x453db2)),
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text(
+                'Total due',
+                style: pw.TextStyle(
+                  color: _pdfColor(0xe7e5ff),
+                  fontSize: 8,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.Text(
+                _money.format(total),
+                style: pw.TextStyle(
+                  color: PdfColors.white,
+                  fontSize: 13,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            ],
           ),
-          cellStyle: const pw.TextStyle(fontSize: 8),
-          cellPadding: const pw.EdgeInsets.symmetric(
-            horizontal: 8,
-            vertical: 5,
-          ),
-          columnWidths: {
-            0: const pw.FlexColumnWidth(2.2),
-            1: const pw.FlexColumnWidth(1.45),
-            2: const pw.FlexColumnWidth(1),
-          },
-          headers: ['Expense', 'Type', 'This house'],
-          data: [...commonRows, ...specificRows],
         ),
+        if (rows.isEmpty)
+          pw.Padding(
+            padding: const pw.EdgeInsets.all(10),
+            child: pw.Text(
+              'No dues for this month',
+              style: pw.TextStyle(fontSize: 8, color: _pdfColor(0x52635f)),
+            ),
+          )
+        else
+          pw.TableHelper.fromTextArray(
+            border: null,
+            headerDecoration: pw.BoxDecoration(color: _pdfColor(0xf5fbfa)),
+            headerStyle: pw.TextStyle(
+              fontSize: 8,
+              fontWeight: pw.FontWeight.bold,
+              color: _pdfColor(0x52635f),
+            ),
+            cellStyle: const pw.TextStyle(fontSize: 8),
+            cellPadding: const pw.EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 5,
+            ),
+            columnWidths: {
+              0: const pw.FlexColumnWidth(1.8),
+              1: const pw.FlexColumnWidth(1.9),
+              2: const pw.FlexColumnWidth(1),
+            },
+            headers: ['Expense', 'Split type', 'Due'],
+            data: rows,
+          ),
       ],
     ),
   );
+}
+
+String _pdfExpenseSplitType(ExpenseEntry expense, String houseId) {
+  if (expense.waterUsageBased) {
+    final usage = expense.waterUsageForHouse(houseId);
+    final percent = expense.waterUsagePercentForHouse(houseId);
+    return 'Usage ${_decimal.format(usage)} units (${_percent.format(percent)})';
+  }
+  if (expense.targetHouseId != null) {
+    return 'Specific';
+  }
+  return 'Common equal';
 }
 
 pw.Widget _pdfIconBadge(String icon, PdfColor color) {
